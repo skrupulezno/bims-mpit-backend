@@ -1,6 +1,16 @@
 version: "3.8"
 
 services:
+  app:
+    build: .
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://admin:123456@db:5432/mpit
+
   db:
     image: postgres:13-alpine
     container_name: postgres_db
