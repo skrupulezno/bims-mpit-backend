@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app import auth, models, database, schemas
-from fastapi.security import OAuth2PasswordRequestForm
-
 
 router = APIRouter()
 
@@ -26,19 +25,31 @@ def authenticate_user(db: Session, username: str, password: str):
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if get_user(db, user.username):
         raise HTTPException(status_code=400, detail="Username already registered")
-    new_user = models.User(username=user.username, hashed_password=auth.get_password_hash(user.password))
+    new_user = models.User(
+        username=user.username, 
+        hashed_password=auth.get_password_hash(user.password)
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return {"msg": "User created successfully"}
 
 @router.post("/login")
-def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    response: Response, 
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Session = Depends(get_db)
+):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     access_token = auth.create_access_token(data={"sub": user.username})
-    response.set_cookie(key="access_token", value=access_token, httponly=True, max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
     return {"msg": "Login successful"}
 
 @router.get("/protected")
@@ -50,3 +61,8 @@ def protected_route(request: Request):
     if not username:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return {"msg": f"Hello, {username}"}
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(key="access_token")
+    return {"msg": "Logout successful"}
