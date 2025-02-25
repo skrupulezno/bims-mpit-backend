@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 
-# Параметры JWT
 JWT_SECRET = "tytytytsdff"  
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
