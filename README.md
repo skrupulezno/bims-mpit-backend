@@ -1,9 +1,5 @@
 # БИМС МПИТ BACKEND 
 
-## Запуск проекта
-
-# БИМС МПИТ BACKEND 
-
 ## Запуск контейнера
 
 `docker-compose build`
