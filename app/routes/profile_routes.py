@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app import models, schemas,  database
+from app import models, schemas, database
 from app.profile import generate_corporate_email
-from app.routes.auth_routes import get_current_user 
+from app.routes.auth_routes import get_current_user
+
 router = APIRouter()
 
 def get_db():
@@ -13,7 +14,7 @@ def get_db():
         db.close()
 
 @router.post("/profile")
-def create_or_update_profile(
+async def create_or_update_profile(
     profile_data: schemas.ProfileCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
@@ -44,7 +45,7 @@ def create_or_update_profile(
         return new_profile
 
 @router.get("/profile")
-def get_profile(
+async def get_profile(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):

@@ -1,18 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
 import uuid
-
-class Department(Base):
-    __tablename__ = "departments"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True)
-    description = Column(String, nullable=True)
-    
-    employees = relationship("EmployeeProfile", back_populates="department")
-    news = relationship("News", back_populates="department")
 
 class User(Base):
     __tablename__ = "users"
@@ -55,12 +45,22 @@ class EmployeeProfile(Base):
     user = relationship("User", back_populates="profile")
     department = relationship("Department", back_populates="employees")
 
+class Department(Base):
+    __tablename__ = "departments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    description = Column(String, nullable=True)
+    
+    employees = relationship("EmployeeProfile", back_populates="department")
+    news = relationship("News", back_populates="department")
+
 class News(Base):
     __tablename__ = "news"
     
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String)
-    content = Column(String)
+    content = Column(Text)
     news_type = Column(String) 
     is_approved = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -70,7 +70,6 @@ class News(Base):
     
     author = relationship("User")
     department = relationship("Department", back_populates="news")
-
 
 class Document(Base):
     __tablename__ = "documents"

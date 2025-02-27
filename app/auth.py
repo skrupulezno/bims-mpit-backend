@@ -5,12 +5,6 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     model_config = {"extra": "allow", "env_file": ".env"}
-    postgres_user: str
-    postgres_password: str
-    postgres_db: str
-    db_host: str
-    db_port: int
-
     jwt_secret: str = "rnd"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -46,4 +40,3 @@ def decode_token(token: str):
         return payload
     except JWTError:
         return None
-

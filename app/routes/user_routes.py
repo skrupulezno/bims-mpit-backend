@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app import models, database, auth
+from app import models, database
 from app.routes.auth_routes import get_current_user
 
 router = APIRouter()
@@ -13,7 +13,7 @@ def get_db():
         db.close()
 
 @router.patch("/users/{user_id}/upgrade")
-def upgrade_user(
+async def upgrade_user(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)

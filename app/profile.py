@@ -1,7 +1,3 @@
-import re
-from sqlalchemy.orm import Session
-from app.models import EmployeeProfile
-
 def transliterate(text: str) -> str:
     mapping = {
         'А': 'A', 'а': 'a',
@@ -40,7 +36,8 @@ def transliterate(text: str) -> str:
     }
     return ''.join(mapping.get(char, char) for char in text)
 
-def generate_corporate_email(db: Session, full_name: str) -> str:
+def generate_corporate_email(db, full_name: str) -> str:
+    from app.models import EmployeeProfile
     name_parts = full_name.split()
     if len(name_parts) < 2:
         raise ValueError("Необходимо имя и фамилия")

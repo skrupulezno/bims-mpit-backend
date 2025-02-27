@@ -1,27 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from app import models, schemas, auth, database
+from app.database import SessionLocal
+from app.auth import create_access_token, create_refresh_token, decode_token, get_password_hash, verify_password
+from slowapi.util import get_remote_address
+from fastapi_limiter.depends import RateLimiter
 
 router = APIRouter()
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 def get_user(db: Session, phone: str):
     return db.query(models.User).filter(models.User.phone_number == phone).first()
-
 
 def authenticate_user(db: Session, phone: str, password: str):
     user = get_user(db, phone)
     if not user or not auth.verify_password(password, user.hashed_password, user.pepper):
         return None
     return user
-
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 def get_current_user(request: Request, db: Session = Depends(get_db)):
     token = request.cookies.get("access_token")
@@ -36,14 +38,18 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     return user
 
-@router.post("/register")
-def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if get_user(db, user.phone):
         raise HTTPException(status_code=400, detail="Телефон уже зарегистрирован")
     
     new_user = models.User(
         phone_number=user.phone,
     )
+    if not new_user.pepper:
+        import uuid
+        new_user.pepper = uuid.uuid4().hex
+
     new_user.hashed_password = auth.get_password_hash(user.password, new_user.pepper)
     new_user.system_role = "guest"
     db.add(new_user)
@@ -52,20 +58,17 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     return {"msg": "Пользователь успешно зарегистрирован"}
 
-@router.post("/login")
-def login(
-    response: Response,
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    user = authenticate_user(db, form_data.username, form_data.password)
+
+@router.post("/login", dependencies=[Depends(RateLimiter(times=5, seconds=300))])
+async def login(response: Response, request: Request, form_data: schemas.UserCreate, db: Session = Depends(get_db)):
+    user = authenticate_user(db, form_data.phone, form_data.password)
     if not user:
         raise HTTPException(status_code=400, detail="Неверный телефон или пароль")
     
-    access_token = auth.create_access_token(data={"sub": user.phone_number})
-    refresh_token = auth.create_refresh_token(data={"sub": user.phone_number})
+    access_token = create_access_token(data={"sub": user.phone_number})
+    refresh_token = create_refresh_token(data={"sub": user.phone_number})
 
-    expires_at = datetime.utcnow() + timedelta(days=auth.REFRESH_TOKEN_EXPIRE_DAYS)
+    expires_at = datetime.utcnow() + timedelta(days=auth.settings.refresh_token_expire_days)
     new_session = models.Session(
         user_id=user.id,
         refresh_token=refresh_token,
@@ -78,18 +81,22 @@ def login(
         key="access_token",
         value=access_token,
         httponly=True,
-        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        max_age=auth.settings.access_token_expire_minutes * 60,
+        secure=True,
+        samesite="lax"
     )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        max_age=auth.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600
+        max_age=auth.settings.refresh_token_expire_days * 24 * 3600,
+        secure=True,
+        samesite="lax"
     )
     return {"msg": "Вход выполнен успешно"}
 
 @router.post("/refresh")
-def refresh_access_token(request: Request, response: Response, db: Session = Depends(get_db)):
+async def refresh_access_token(request: Request, response: Response, db: Session = Depends(get_db)):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Отсутствует refresh токен")
@@ -108,17 +115,19 @@ def refresh_access_token(request: Request, response: Response, db: Session = Dep
         raise HTTPException(status_code=401, detail="Сессия истекла")
     
     phone = payload.get("sub")
-    new_access_token = auth.create_access_token(data={"sub": phone})
+    new_access_token = create_access_token(data={"sub": phone})
     response.set_cookie(
         key="access_token",
         value=new_access_token,
         httponly=True,
-        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        max_age=auth.settings.access_token_expire_minutes * 60,
+        secure=True,
+        samesite="lax"
     )
     return {"msg": "Access токен обновлен"}
 
 @router.post("/logout")
-def logout(response: Response, request: Request, db: Session = Depends(get_db)):
+async def logout(response: Response, request: Request, db: Session = Depends(get_db)):
     refresh_token = request.cookies.get("refresh_token")
     if refresh_token:
         session_record = db.query(models.Session).filter(models.Session.refresh_token == refresh_token).first()
@@ -130,20 +139,42 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)):
     return {"msg": "Вы вышли из системы"}
 
 @router.get("/protected")
-def protected_route(request: Request, db: Session = Depends(get_db)):
+async def protected_route(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
     return {"msg": f"Привет, {current_user.phone_number}"}
 
 @router.get("/active_sessions")
-def get_active_sessions(db: Session = Depends(get_db)):
-    from datetime import datetime
+async def get_active_sessions(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     now = datetime.utcnow()
-    active_sessions = db.query(models.Session).filter(models.Session.expires_at > now).all()
+    active_sessions = db.query(models.Session).filter(
+        models.Session.user_id == current_user.id,
+        models.Session.expires_at > now
+    ).all()
     
     results = []
     for session in active_sessions:
         results.append({
-            "phone": session.user.phone_number,
-            "started_at": session.created_at
+            "phone": current_user.phone_number,
+            "started_at": session.created_at.isoformat()
         })
     return results
+
+@router.delete("/active_sessions/{session_id}")
+async def delete_active_session(
+    session_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    session_obj = db.query(models.Session).filter(
+        models.Session.id == session_id,
+        models.Session.user_id == current_user.id
+    ).first()
+    if not session_obj:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    
+    db.delete(session_obj)
+    db.commit()
+    return {"msg": "Сессия успешно удалена"}
