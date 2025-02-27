@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
+import uuid
 
 class Department(Base):
     __tablename__ = "departments"
@@ -19,7 +20,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     phone_number = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    system_role = Column(String, default="guest") 
+    system_role = Column(String, default="guest")
+    pepper = Column(String, default=lambda: uuid.uuid4().hex)
     
     sessions = relationship("Session", back_populates="user")
     profile = relationship("EmployeeProfile", back_populates="user", uselist=False)

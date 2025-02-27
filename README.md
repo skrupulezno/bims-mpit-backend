@@ -1,8 +1,15 @@
-создание env
-`python -m venv env`
+# БИМС МПИТ BACKEND 
 
-windows
-`.\env\Scripts\activate`
+## Запуск проекта
+
+# БИМС МПИТ BACKEND 
+
+## Запуск контейнера
+
+`docker-compose build`
+`docker-compose up`
+
+## Запуск локально
 
 linux 
 `source env/bin/activate`
