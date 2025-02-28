@@ -36,6 +36,7 @@ async def shutdown():
 
 origins = [
     "http://localhost",
+    'http://localhost:3000',
     "http://138.124.20.90",
 ]
 app.add_middleware(
@@ -53,7 +54,7 @@ app.add_exception_handler(429, _rate_limit_exceeded_handler)
 
 # Middleware для сессий
 SESSION_SECRET = os.getenv("SESSION_SECRET", "defaultsecret")
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
+#app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 
 # Middleware для логирования всех запросов и ответов
 @app.middleware("http")
