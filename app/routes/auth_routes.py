@@ -6,6 +6,7 @@ from app.database import SessionLocal
 from app.auth import create_access_token, create_refresh_token, decode_token, get_password_hash, verify_password
 from slowapi.util import get_remote_address
 from fastapi_limiter.depends import RateLimiter
+from app.schemas import LoginSchema
 
 router = APIRouter()
 
@@ -58,9 +59,8 @@ async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     return {"msg": "Пользователь успешно зарегистрирован"}
 
-
 @router.post("/login", dependencies=[Depends(RateLimiter(times=5, seconds=300))])
-async def login(response: Response, request: Request, form_data: schemas.UserCreate, db: Session = Depends(get_db)):
+async def login(response: Response, request: Request, form_data: LoginSchema, db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.phone, form_data.password)
     if not user:
         raise HTTPException(status_code=400, detail="Неверный телефон или пароль")

@@ -7,6 +7,10 @@ class UserCreate(BaseModel):
     first_name: str
     last_name: str
 
+class LoginSchema(BaseModel):
+    phone: str
+    password: str
+
 class Token(BaseModel):
     access_token: str
     token_type: str

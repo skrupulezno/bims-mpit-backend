@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -9,6 +10,15 @@ from fastapi.responses import JSONResponse
 from fastapi_limiter import FastAPILimiter
 import aioredis
 
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("app.log", mode="a", encoding="utf-8"),  
+        logging.StreamHandler() 
+    ]
+)
 
 # Инициализируем базу данных (создаем таблицы, если их еще нет)
 Base.metadata.create_all(bind=engine)
@@ -45,16 +55,14 @@ import os
 SESSION_SECRET = os.getenv("SESSION_SECRET", "defaultsecret")
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 
-# Простейшее логирование запросов (для аудита)
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    import time, logging
+    import time
     logger = logging.getLogger("uvicorn.access")
     start_time = time.time()
     response = await call_next(request)
     process_time = (time.time() - start_time) * 1000
     logger.info("%s %s %s (%.2fms)", request.method, request.url, response.status_code, process_time)
-
     return response
 
 async def custom_rate_limit_exceeded_handler(request: Request, exc):
@@ -65,7 +73,7 @@ async def custom_rate_limit_exceeded_handler(request: Request, exc):
     )
 
 # Таймауты
-# app.add_exception_handler(429, custom_rate_limit_exceeded_handler)
+app.add_exception_handler(429, custom_rate_limit_exceeded_handler)
 
 # Роуты
 app.include_router(auth_routes.router, prefix="/api", tags=["auth"])
