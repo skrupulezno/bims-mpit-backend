@@ -105,7 +105,7 @@ async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     return {"msg": "Пользователь успешно зарегистрирован"}
 
-@router.post("/login", dependencies=[Depends(RateLimiter(times=5, seconds=300))])
+@router.post("/login", dependencies=[Depends(RateLimiter(times=5, seconds=30))])
 async def login(response: Response, request: Request, form_data: LoginSchema, db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.phone, form_data.password)
     if not user:
@@ -211,28 +211,30 @@ async def get_active_sessions(
         })
     return results
 
-@router.get("/read-cookies")
-def read_cookies(request: Request):
-    access_token = request.cookies.get("access_token")
-    refresh_token = request.cookies.get("refresh_token")
-    return {"access_token": access_token, "refresh_token": refresh_token}
-
 @router.delete("/active_sessions/{session_id}")
 async def delete_active_session(
     session_id: int,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    session_obj = db.query(models.Session).filter(
-        models.Session.id == session_id,
-        models.Session.user_id == current_user.id
-    ).first()
-    if not session_obj:
-        raise HTTPException(status_code=404, detail="Сессия не найдена")
-    
+    if current_user.system_role == "admin":
+        session_obj = db.query(models.Session).filter(models.Session.id == session_id).first()
+        if not session_obj:
+            raise HTTPException(status_code=404, detail="Сессия не найдена")
+    elif current_user.system_role == "employee":
+        session_obj = db.query(models.Session).filter(
+            models.Session.id == session_id,
+            models.Session.user_id == current_user.id
+        ).first()
+        if not session_obj:
+            raise HTTPException(status_code=404, detail="Сессия не найдена или не принадлежит текущему пользователю")
+    else:
+        raise HTTPException(status_code=404, detail="Гости не могут удалять сессии")
     db.delete(session_obj)
     db.commit()
     return {"msg": "Сессия успешно удалена"}
+
+
 
 @router.get("/role")
 async def get_user_role(current_user: models.User = Depends(get_current_user)):

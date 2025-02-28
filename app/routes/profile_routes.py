@@ -83,6 +83,31 @@ async def get_profile(
     }
     return result
 
+@router.get("/search")
+async def search_employees(
+    query: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.system_role not in ["worker", "admin"]:
+        raise HTTPException(status_code=403, detail="Доступ запрещен")
+    
+    mock_employees = [
+        {"id": 1, "first_name": "Иван", "last_name": "Петров", "business_role": "Инженер", "department": "IT"},
+        {"id": 2, "first_name": "Мария", "last_name": "Сидорова", "business_role": "Менеджер", "department": "Продажи"},
+        {"id": 3, "first_name": "Алексей", "last_name": "Смирнов", "business_role": "Разработчик", "department": "IT"},
+        {"id": 4, "first_name": "Ольга", "last_name": "Козлова", "business_role": "HR", "department": "Кадры"},
+        {"id": 5, "first_name": "Дмитрий", "last_name": "Федоров", "business_role": "Аналитик", "department": "Маркетинг"},
+    ]
+
+    filtered_employees = [
+        emp for emp in mock_employees
+        if query.lower() in emp["first_name"].lower() or query.lower() in emp["last_name"].lower()
+    ]
+
+    return filtered_employees
+
+
 @router.get("/profile/{profile_id}")
 async def get_profile_by_id(
     profile_id: int,
