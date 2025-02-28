@@ -14,7 +14,7 @@ class User(Base):
     hashed_password = Column(String)
     system_role = Column(String, default="guest")
     pepper = Column(String, default=lambda: uuid.uuid4().hex)
-    # password_last_updated = Column(DateTime, default=datetime.utcnow)
+    password_last_updated = Column(DateTime, default=datetime.utcnow)
     
     sessions = relationship("Session", back_populates="user")
     profile = relationship("EmployeeProfile", back_populates="user", uselist=False)
@@ -63,6 +63,7 @@ class News(Base):
     title = Column(String)
     content = Column(Text)
     news_type = Column(String) 
+    photo_url = Column(String) 
     is_approved = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)

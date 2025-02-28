@@ -112,17 +112,17 @@ async def login(response: Response, request: Request, form_data: LoginSchema, db
     response.set_cookie(
         key="access_token",
         value=access_token,
-        httponly=True,
+        httponly=False,
         max_age=auth.settings.access_token_expire_minutes * 60,
-        secure=True,
+        secure=False,
         samesite="lax"
     )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        httponly=True,
+        httponly=False,
         max_age=auth.settings.refresh_token_expire_days * 24 * 3600,
-        secure=True,
+        secure=False,
         samesite="lax"
     )
     return {
@@ -156,7 +156,7 @@ async def refresh_access_token(request: Request, response: Response, db: Session
         value=new_access_token,
         httponly=True,
         max_age=auth.settings.access_token_expire_minutes * 60,
-        secure=True,
+        secure=False,
         samesite="lax"
     )
     return {"msg": "Access токен обновлен"}
@@ -196,6 +196,12 @@ async def get_active_sessions(
             "started_at": session.created_at.isoformat()
         })
     return results
+
+@router.get("/read-cookies")
+def read_cookies(request: Request):
+    access_token = request.cookies.get("access_token")
+    refresh_token = request.cookies.get("refresh_token")
+    return {"access_token": access_token, "refresh_token": refresh_token}
 
 @router.delete("/active_sessions/{session_id}")
 async def delete_active_session(
