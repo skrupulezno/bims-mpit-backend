@@ -145,8 +145,6 @@ async def get_all_profiles(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.system_role != "admin":
-        raise HTTPException(status_code=403, detail="Доступ только для администраторов")
     
     profiles = db.query(models.EmployeeProfile).all()
     results = []
@@ -175,7 +173,6 @@ async def get_departments(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Можно добавить дополнительную логику проверки прав, если требуется
     departments = db.query(models.Department).all()
     results = [
         {
