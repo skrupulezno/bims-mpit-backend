@@ -12,7 +12,6 @@ from app.database import engine, Base
 from app.routes import auth_routes, profile_routes, user_routes, docs_routes, news_routes
 import aioredis
 
-# Настройка логирования: все логи будут записываться в файл app.log
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -21,7 +20,6 @@ logging.basicConfig(
     ]
 )
 
-# Создание таблиц в базе данных
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Secure Corporate Portal")
@@ -36,7 +34,6 @@ async def startup():
 async def shutdown():
     logging.info("Остановка приложения.")
 
-# CORS настройка
 origins = [
     "http://localhost",
     "http://138.124.20.90",

@@ -1,13 +1,14 @@
+import re
+import uuid
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
 from app import models, schemas, auth
 from app.database import SessionLocal
 from app.auth import create_access_token, create_refresh_token, decode_token, get_password_hash, verify_password
 from slowapi.util import get_remote_address
 from fastapi_limiter.depends import RateLimiter
 from app.schemas import LoginSchema
-import uuid
 
 router = APIRouter()
 
@@ -16,7 +17,7 @@ def get_db():
     try:
         yield db
     finally:
-        db.close()
+        db.close() 
 
 def get_user(db: Session, phone: str):
     return db.query(models.User).filter(models.User.phone_number == phone).first()
@@ -40,10 +41,39 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     return user
 
+def validate_password(password: str) -> bool:
+    """
+    Проверяет, удовлетворяет ли пароль следующим критериям:
+    - Минимум 8 символов
+    - Хотя бы одна заглавная буква
+    - Хотя бы одна строчная буква
+    - Хотя бы одна цифра
+    - Хотя бы один специальный символ
+    """
+    if len(password) < 8:
+        return False
+    if not re.search(r"[A-Z]", password):
+        return False
+    if not re.search(r"[a-z]", password):
+        return False
+    if not re.search(r"[0-9]", password):
+        return False
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False
+    return True
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if get_user(db, user.phone):
         raise HTTPException(status_code=400, detail="Телефон уже зарегистрирован")
+    
+    # Проверяем пароль на соответствие критериям
+    if not validate_password(user.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Пароль не удовлетворяет требованиям безопасности: минимум 8 символов, "
+                   "хотя бы одна заглавная буква, одна строчная буква, одна цифра и один специальный символ."
+        )
     
     new_user = models.User(
         phone_number=user.phone,
@@ -95,7 +125,10 @@ async def login(response: Response, request: Request, form_data: LoginSchema, db
         secure=True,
         samesite="lax"
     )
-    return {"msg": "Вход выполнен успешно"}
+    return {
+        "msg": "success",
+        "role": user.system_role
+    }
 
 @router.post("/refresh")
 async def refresh_access_token(request: Request, response: Response, db: Session = Depends(get_db)):
@@ -180,3 +213,7 @@ async def delete_active_session(
     db.delete(session_obj)
     db.commit()
     return {"msg": "Сессия успешно удалена"}
+
+@router.get("/role")
+async def get_user_role(current_user: models.User = Depends(get_current_user)):
+    return {"role": current_user.system_role}
