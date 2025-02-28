@@ -34,3 +34,7 @@ class ProfileUpdate(BaseModel):
 class ChangePasswordSchema(BaseModel):
     old_password: str
     new_password: str
+
+class ProfileAdminUpdate(BaseModel):
+    department_id: Optional[int] = None
+    business_role: Optional[str] = None
