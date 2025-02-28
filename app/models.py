@@ -9,6 +9,8 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     phone_number = Column(String, unique=True, index=True)
+    first_name = Column(String)        
+    last_name = Column(String)          
     hashed_password = Column(String)
     system_role = Column(String, default="guest")
     pepper = Column(String, default=lambda: uuid.uuid4().hex)
@@ -34,8 +36,6 @@ class EmployeeProfile(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True)
-    first_name = Column(String)
-    last_name = Column(String)
     business_role = Column(String)
     corporate_email = Column(String, unique=True, index=True)
     photo_url = Column(String)

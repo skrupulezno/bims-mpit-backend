@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from app import models, schemas, auth, database
+from app import models, schemas, auth
 from app.database import SessionLocal
 from app.auth import create_access_token, create_refresh_token, decode_token, get_password_hash, verify_password
 from slowapi.util import get_remote_address
 from fastapi_limiter.depends import RateLimiter
 from app.schemas import LoginSchema
+import uuid
 
 router = APIRouter()
 
@@ -46,9 +47,10 @@ async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     new_user = models.User(
         phone_number=user.phone,
+        first_name=user.first_name,    
+        last_name=user.last_name     
     )
     if not new_user.pepper:
-        import uuid
         new_user.pepper = uuid.uuid4().hex
 
     new_user.hashed_password = auth.get_password_hash(user.password, new_user.pepper)

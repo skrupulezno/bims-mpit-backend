@@ -9,30 +9,26 @@ from slowapi.util import get_remote_address
 from fastapi.responses import JSONResponse
 from fastapi_limiter import FastAPILimiter
 import aioredis
-
+import os
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("app.log", mode="a", encoding="utf-8"),  
-        logging.StreamHandler() 
+        logging.FileHandler("app.log", mode="a", encoding="utf-8")
     ]
 )
 
-# Инициализируем базу данных (создаем таблицы, если их еще нет)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Secure Corporate Portal")
 
 @app.on_event("startup")
 async def startup():
-    import aioredis
     redis = await aioredis.from_url("redis://redis:6379", encoding="utf8", decode_responses=True)
     await FastAPILimiter.init(redis)
 
-
-# CORS – разрешаем запросы только с доверенных источников
+# CORS 
 origins = [
     "http://localhost",
     "http://138.124.20.90",
@@ -45,24 +41,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate Limiter (защита от DDoS, брутфорса) с помощью slowapi
+# Rate Limiter (защита от DDoS, брутфорса)
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(429, _rate_limit_exceeded_handler)
 
-# Middleware для сессий – используется для хранения токенов в HttpOnly cookie
-import os
+# Middleware для сессий
 SESSION_SECRET = os.getenv("SESSION_SECRET", "defaultsecret")
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     import time
-    logger = logging.getLogger("uvicorn.access")
     start_time = time.time()
     response = await call_next(request)
     process_time = (time.time() - start_time) * 1000
-    logger.info("%s %s %s (%.2fms)", request.method, request.url, response.status_code, process_time)
+    log_message = f"{request.method} {request.url} {response.status_code} ({process_time:.2f}ms)"
+    logging.info(log_message)
     return response
 
 async def custom_rate_limit_exceeded_handler(request: Request, exc):
@@ -72,7 +67,6 @@ async def custom_rate_limit_exceeded_handler(request: Request, exc):
         content={"detail": "Превышен лимит запросов", "rate_limit": view_rate_limit},
     )
 
-# Таймауты
 app.add_exception_handler(429, custom_rate_limit_exceeded_handler)
 
 # Роуты
@@ -81,4 +75,3 @@ app.include_router(profile_routes.router, prefix="/api", tags=["profile"])
 app.include_router(user_routes.router, prefix="/api", tags=["users"])
 app.include_router(docs_routes.router, prefix="/api", tags=["documents"])
 app.include_router(news_routes.router, prefix="/api/news", tags=["news"])
-

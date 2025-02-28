@@ -22,3 +22,4 @@ async def download_document(doc_id: int, db: Session = Depends(get_db)):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Файл не найден")
     return FileResponse(file_path, media_type="application/octet-stream", filename=document.title)
+

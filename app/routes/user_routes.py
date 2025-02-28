@@ -1,14 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app import models
-from app.database import get_db
-from pydantic import BaseModel
+from app import database, models
+from app.routes.auth_routes import get_current_user
 
 router = APIRouter()
 
-class UpgradeUserRequest(BaseModel):
-    first_name: str
-    last_name: str
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def transliterate(text: str) -> str:
     mapping = {
@@ -83,7 +85,6 @@ def generate_corporate_email(db: Session, full_name: str) -> str:
 @router.patch("/users/{user_id}/upgrade")
 async def upgrade_user(
     user_id: int,
-    upgrade_data: UpgradeUserRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -101,12 +102,10 @@ async def upgrade_user(
     db.commit()
     
     if not target_user.profile:
-        full_name = f"{upgrade_data.first_name} {upgrade_data.last_name}"
+        full_name = f"{target_user.first_name} {target_user.last_name}"
         corporate_email = generate_corporate_email(db, full_name)
         new_profile = models.EmployeeProfile(
             user_id=target_user.id,
-            first_name=upgrade_data.first_name,
-            last_name=upgrade_data.last_name,
             corporate_email=corporate_email
         )
         db.add(new_profile)

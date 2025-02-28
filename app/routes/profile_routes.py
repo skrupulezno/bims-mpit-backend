@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import models, schemas, database
-from app.profile import generate_corporate_email
 from app.routes.auth_routes import get_current_user
 
 router = APIRouter()
@@ -23,14 +22,34 @@ async def update_profile(
         raise HTTPException(status_code=403, detail="Гостевой пользователь не может изменять профиль")
     
     profile = db.query(models.EmployeeProfile).filter(models.EmployeeProfile.user_id == current_user.id).first()
-    if profile:
-        profile.first_name = profile_data.first_name
-        profile.last_name = profile_data.last_name
-        profile.additional_info = profile_data.additional_info
-        db.commit()
-        return {"msg": "Профиль обновлен"}
-    else:
+    if not profile:
         raise HTTPException(status_code=404, detail="Профиль не найден")
+    
+    if profile_data.photo_url is not None:
+        profile.photo_url = profile_data.photo_url
+    if profile_data.additional_info is not None:
+        profile.additional_info = profile_data.additional_info
+    
+    if profile.user:
+        if hasattr(profile_data, "first_name") and profile_data.first_name is not None:
+            profile.user.first_name = profile_data.first_name
+        if hasattr(profile_data, "last_name") and profile_data.last_name is not None:
+            profile.user.last_name = profile_data.last_name
+    
+    db.commit()
+    db.refresh(profile)
+    
+    result = {
+        "id": profile.id,
+        "user_id": profile.user_id,
+        "photo_url": profile.photo_url,
+        "additional_info": profile.additional_info,
+        "user": {
+            "first_name": profile.user.first_name,
+            "last_name": profile.user.last_name
+        } if profile.user else None,
+    }
+    return result
 
 
 @router.get("/profile")
@@ -44,7 +63,25 @@ async def get_profile(
     profile = db.query(models.EmployeeProfile).filter(models.EmployeeProfile.user_id == current_user.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Профиль не найден")
-    return profile
+
+    result = {
+        "id": profile.id,
+        "user_id": profile.user_id,
+        "business_role": profile.business_role,
+        "corporate_email": profile.corporate_email,
+        "photo_url": profile.photo_url,
+        "additional_info": profile.additional_info,
+        "department_id": profile.department_id,
+        "user": {
+            "first_name": current_user.first_name,
+            "last_name": current_user.last_name
+        },
+        "department": {
+            "id": profile.department.id,
+            "name": profile.department.name
+        } if profile.department else None
+    }
+    return result
 
 @router.get("/profile/{profile_id}")
 async def get_profile_by_id(
@@ -59,7 +96,24 @@ async def get_profile_by_id(
     if not profile:
         raise HTTPException(status_code=404, detail="Профиль не найден")
     
-    return profile
+    result = {
+        "id": profile.id,
+        "user_id": profile.user_id,
+        "business_role": profile.business_role,
+        "corporate_email": profile.corporate_email,
+        "photo_url": profile.photo_url,
+        "additional_info": profile.additional_info,
+        "department_id": profile.department_id,
+        "user": {
+            "first_name": profile.user.first_name,
+            "last_name": profile.user.last_name
+        } if profile.user else None,
+        "department": {
+            "id": profile.department.id,
+            "name": profile.department.name
+        } if profile.department else None
+    }
+    return result
 
 @router.get("/profiles")
 async def get_all_profiles(
@@ -70,4 +124,23 @@ async def get_all_profiles(
         raise HTTPException(status_code=403, detail="Доступ только для администраторов")
     
     profiles = db.query(models.EmployeeProfile).all()
-    return profiles
+    results = []
+    for profile in profiles:
+        results.append({
+            "id": profile.id,
+            "user_id": profile.user_id,
+            "business_role": profile.business_role,
+            "corporate_email": profile.corporate_email,
+            "photo_url": profile.photo_url,
+            "additional_info": profile.additional_info,
+            "department_id": profile.department_id,
+            "user": {
+                "first_name": profile.user.first_name,
+                "last_name": profile.user.last_name
+            } if profile.user else None,
+            "department": {
+                "id": profile.department.id,
+                "name": profile.department.name
+            } if profile.department else None
+        })
+    return results
