@@ -62,12 +62,26 @@ def validate_password(password: str) -> bool:
         return False
     return True
 
+def validate_phone(phone: str) -> bool:
+    """
+    Проверяет, соответствует ли номер телефона формату:
+    - Только цифры
+    - От 10 до 15 цифр
+    """
+    return bool(re.fullmatch(r"\d{10,15}", phone))
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    if not validate_phone(user.phone):
+        raise HTTPException(
+            status_code=400,
+            detail="Неверный формат номера телефона. Используйте формат: от 10 до 15 цифр без символа '+'."
+        )
+    
     if get_user(db, user.phone):
         raise HTTPException(status_code=400, detail="Телефон уже зарегистрирован")
     
-    # Проверяем пароль на соответствие критериям
     if not validate_password(user.password):
         raise HTTPException(
             status_code=400,
