@@ -14,7 +14,7 @@ def get_db():
 
 @router.post("/profile")
 async def update_profile(
-    profile_data: schemas.ProfileCreate,
+    profile_data: schemas.ProfileUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):

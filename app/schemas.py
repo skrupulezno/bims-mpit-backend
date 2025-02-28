@@ -24,3 +24,9 @@ class NewsCreate(BaseModel):
     title: str
     content: str
     news_type: Optional[str] = None
+
+class ProfileUpdate(BaseModel):
+    photo_url: Optional[str] = None
+    additional_info: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
