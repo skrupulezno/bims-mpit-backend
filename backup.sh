@@ -19,3 +19,6 @@ else
 fi
 
 # Добавить в cron 
+# chmod +x /backup.sh
+# crontab -e
+# 0 2 * * * /путь/к/скрипту/backup.sh
