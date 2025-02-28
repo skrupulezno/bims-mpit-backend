@@ -7,4 +7,4 @@
     script: |
       cd ./repos/bims-mpit-backend
       git pull origin master
-      docker-compose up --build -d
+      docker-compose up --build
