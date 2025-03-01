@@ -75,3 +75,7 @@ class SmartSearchResponse(BaseModel):
     employees: List[EmployeeResponse]
     news: List[NewsResponse]
     documents: List[DocumentResponse]
+      
+class ProfileAdminUpdate(BaseModel):
+    department_id: Optional[int] = None
+    business_role: Optional[str] = None

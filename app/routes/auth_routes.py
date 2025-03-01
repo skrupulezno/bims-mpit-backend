@@ -62,12 +62,26 @@ def validate_password(password: str) -> bool:
         return False
     return True
 
+def validate_phone(phone: str) -> bool:
+    """
+    Проверяет, соответствует ли номер телефона формату:
+    - Только цифры
+    - От 10 до 15 цифр
+    """
+    return bool(re.fullmatch(r"\d{10,15}", phone))
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    if not validate_phone(user.phone):
+        raise HTTPException(
+            status_code=400,
+            detail="Неверный формат номера телефона. Используйте формат: от 10 до 15 цифр без символа '+'."
+        )
+    
     if get_user(db, user.phone):
         raise HTTPException(status_code=400, detail="Телефон уже зарегистрирован")
     
-    # Проверяем пароль на соответствие критериям
     if not validate_password(user.password):
         raise HTTPException(
             status_code=400,
@@ -91,7 +105,7 @@ async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     return {"msg": "Пользователь успешно зарегистрирован"}
 
-@router.post("/login", dependencies=[Depends(RateLimiter(times=5, seconds=300))])
+@router.post("/login", dependencies=[Depends(RateLimiter(times=5, seconds=30))])
 async def login(response: Response, request: Request, form_data: LoginSchema, db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.phone, form_data.password)
     if not user:
@@ -112,17 +126,17 @@ async def login(response: Response, request: Request, form_data: LoginSchema, db
     response.set_cookie(
         key="access_token",
         value=access_token,
-        httponly=True,
+        httponly=False,
         max_age=auth.settings.access_token_expire_minutes * 60,
-        secure=True,
+        secure=False,
         samesite="lax"
     )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        httponly=True,
+        httponly=False,
         max_age=auth.settings.refresh_token_expire_days * 24 * 3600,
-        secure=True,
+        secure=False,
         samesite="lax"
     )
     return {
@@ -156,7 +170,7 @@ async def refresh_access_token(request: Request, response: Response, db: Session
         value=new_access_token,
         httponly=True,
         max_age=auth.settings.access_token_expire_minutes * 60,
-        secure=True,
+        secure=False,
         samesite="lax"
     )
     return {"msg": "Access токен обновлен"}
@@ -203,16 +217,24 @@ async def delete_active_session(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    session_obj = db.query(models.Session).filter(
-        models.Session.id == session_id,
-        models.Session.user_id == current_user.id
-    ).first()
-    if not session_obj:
-        raise HTTPException(status_code=404, detail="Сессия не найдена")
-    
+    if current_user.system_role == "admin":
+        session_obj = db.query(models.Session).filter(models.Session.id == session_id).first()
+        if not session_obj:
+            raise HTTPException(status_code=404, detail="Сессия не найдена")
+    elif current_user.system_role == "employee":
+        session_obj = db.query(models.Session).filter(
+            models.Session.id == session_id,
+            models.Session.user_id == current_user.id
+        ).first()
+        if not session_obj:
+            raise HTTPException(status_code=404, detail="Сессия не найдена или не принадлежит текущему пользователю")
+    else:
+        raise HTTPException(status_code=404, detail="Гости не могут удалять сессии")
     db.delete(session_obj)
     db.commit()
     return {"msg": "Сессия успешно удалена"}
+
+
 
 @router.get("/role")
 async def get_user_role(current_user: models.User = Depends(get_current_user)):
