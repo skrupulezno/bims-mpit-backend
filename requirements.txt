@@ -10,3 +10,5 @@ slowapi
 fastapi-limiter
 itsdangerous
 aioredis
+datetime
+sentence_transformers
